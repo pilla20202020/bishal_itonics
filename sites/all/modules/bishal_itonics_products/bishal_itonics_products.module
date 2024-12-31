@@ -1,0 +1,309 @@
+<?php
+/**
+ * Implements hook_menu().
+ */
+/**
+ * Implements hook_menu().
+ */
+function bishal_itonics_products_menu() {
+  $items = array();
+
+  // Route for adding a new product.
+  $items['admin/products/add'] = array(
+    'title' => 'Add Product',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('bishal_itonics_products_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  // Route for listing all products.
+  $items['admin/products'] = array(
+    'title' => 'Products List',
+    'page callback' => 'bishal_itonics_products_list',
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/products/delete'] = array(
+    'title' => 'Delete Product',
+    'page callback' => 'bishal_itonics_products_delete',
+    'page arguments' => array(3), // ID will be passed as the third argument.
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/products/view/%'] = array(
+    'title' => 'View Product',
+    'page callback' => 'bishal_itonics_products_view',
+    'page arguments' => array(3), // The product_id will be passed as the third argument.
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Form callback for adding/editing a product.
+ */
+function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
+  // Check if we are editing an existing product, by getting the 'id' from the query string
+  $product_id = isset($_GET['id']) ? $_GET['id'] : NULL;
+
+  // If product_id is available, load the product data
+  if ($product_id) {
+    $product = db_select('bishal_itonics_products', 'p')
+      ->fields('p')
+      ->condition('product_id', $product_id)
+      ->execute()
+      ->fetchObject();
+  }
+
+  // If $product is still empty (not found), redirect or show an error.
+  if (empty($product) && !empty($product_id)) {
+    drupal_set_message(t('Product not found.'), 'error');
+    $form_state['redirect'] = 'admin/products'; // Redirect to product list if not found
+    return $form;
+  }
+
+  // Split the expiry_date into year, month, and day components
+  $expiry_date_parts = !empty($product->expiry_date) ? explode('-', $product->expiry_date) : array('', '', '');
+
+  // Use if conditions to assign default values
+  $expiry_date = array();
+  $expiry_date['year'] = isset($expiry_date_parts[0]) ? $expiry_date_parts[0] : '';
+  $expiry_date['month'] = isset($expiry_date_parts[1]) ? $expiry_date_parts[1] : '';
+  $expiry_date['day'] = isset($expiry_date_parts[2]) ? $expiry_date_parts[2] : '';
+
+  $is_edit = !empty($product);
+
+  $form['title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title'),
+    '#required' => TRUE,
+    '#default_value' => $is_edit ? $product->title : '',
+  );
+
+  $form['image'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Image'),
+    '#upload_location' => 'public://product_images/',
+    '#default_value' => $is_edit ? $product->image : '',
+  );
+
+  $form['summary'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Summary'),
+    '#default_value' => $is_edit ? $product->summary : '',
+  );
+
+  $form['description'] = array(
+    '#type' => 'text_format',
+    '#title' => t('Description'),
+    '#default_value' => $is_edit ? $product->description : '',
+    '#format' => 'full_html',
+  );
+
+  $form['category'] = array(
+    '#type' => 'multiselect',
+    '#title' => t('Category'),
+    '#options' => array(
+      'fashion' => 'Fashion',
+      'electronics' => 'Electronics',
+      'beauty' => 'Beauty',
+    ),
+    '#default_value' => $is_edit ? explode(',', $product->category) : array(),
+  );
+
+  $form['type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Color'),
+    '#options' => array('red' => 'Red', 'blue' => 'Blue'),
+    '#default_value' => $is_edit ? $product->type : '',
+    '#wrapper_attributes' => array('class' => 'form-type-wrapper'),
+  );
+
+  $form['owner_email'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Owner Email'),
+    '#required' => TRUE,
+    '#default_value' => $is_edit ? $product->owner_email : '',
+  );
+
+  $form['expiry_date'] = array(
+    '#type' => 'date',
+    '#title' => t('Expiry Date'),
+    '#default_value' => $expiry_date,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => $is_edit ? t('Update Product') : t('Add Product'),
+    '#submit' => array('bishal_itonics_products_form_submit'),
+  );
+
+  drupal_add_css(drupal_get_path('module', 'multiselect') . '/multiselect.css');
+  drupal_add_js(drupal_get_path('module', 'multiselect') . '/multiselect.js');
+  drupal_add_css(drupal_get_path('module', 'bishal_itonics_products') . '/css/bishal_itonics_products.css');
+
+  return $form;
+}
+
+
+/**
+ * Submit handler for the product form.
+ */
+function bishal_itonics_products_form_submit($form, &$form_state) {
+  $values = $form_state['values'];
+
+  // Retrieve the product_id from the form state
+  $product_id = $values['product_id'];
+
+  // Construct the expiry date
+  $expiry_date = $values['expiry_date']['year'] . '-' . $values['expiry_date']['month'] . '-' . $values['expiry_date']['day'];
+
+  if (!empty($product_id)) {
+    // If product_id exists, perform an update
+    db_update('bishal_itonics_products')
+      ->fields(array(
+        'title' => $values['title'],
+        'image' => $values['image'],
+        'summary' => $values['summary'],
+        'description' => $values['description']['value'],
+        'category' => implode(',', $values['category']),
+        'type' => $values['type'],
+        'owner_email' => $values['owner_email'],
+        'expiry_date' => $expiry_date,
+      ))
+      ->condition('product_id', $product_id)
+      ->execute();
+    drupal_set_message(t('Product updated successfully.'));
+  } else {
+    // If no product_id, perform an insert (add a new product)
+    db_insert('bishal_itonics_products')
+      ->fields(array(
+        'title' => $values['title'],
+        'image' => $values['image'],
+        'summary' => $values['summary'],
+        'description' => $values['description']['value'],
+        'category' => implode(',', $values['category']),
+        'type' => $values['type'],
+        'owner_email' => $values['owner_email'],
+        'expiry_date' => $expiry_date,
+      ))
+      ->execute();
+    drupal_set_message(t('Product added successfully.'));
+  }
+
+  $form_state['redirect'] = 'admin/products';
+}
+
+
+/**
+ * Callback for listing products.
+ */
+function bishal_itonics_products_list() {
+  $create_button = l(t('Create Product'), 'admin/products/add', array('attributes' => array('class' => array('button createProduct'))));
+  $header = array(
+    array('data' => t('Title'), 'field' => 'title'),
+    array('data' => t('Image'), 'field' => 'image'), // Added image column
+    array('data' => t('Owner Email'), 'field' => 'owner_email'),
+    array('data' => t('Expiry Date'), 'field' => 'expiry_date'),
+    t('Operations'),
+  );
+
+  $query = db_select('bishal_itonics_products', 'p')
+    ->fields('p', array('product_id', 'title', 'owner_email', 'expiry_date', 'image')); // Include image field
+
+  $rows = array();
+  foreach ($query->execute() as $product) {
+    $image_column = t('No image');
+
+    if (!empty($product->image)) {
+      $image_file = file_load($product->image);
+      if ($image_file) {
+        $image_url = file_create_url($image_file->uri);
+        $image_column = '<img src="' . $image_url . '" alt="' . check_plain($product->title) . '" width="50" height="50" />';
+      }
+    }
+
+    // Add the product details, including the image column
+    $rows[] = array(
+      $product->title,
+      $image_column, // Image column
+      $product->owner_email,
+      $product->expiry_date,
+      l('View', 'admin/products/view/' . $product->product_id) . ' | ' .
+      l('Edit', 'admin/products/add', array('query' => array('id' => $product->product_id))) . ' | ' .
+      l('Delete', 'admin/products/delete/' . $product->product_id),
+    );
+  }
+
+  return $create_button . theme('table', array('header' => $header, 'rows' => $rows));
+}
+
+/**
+ * Callback for deleting a product.
+ */
+function bishal_itonics_products_delete($product_id) {
+  if ($product_id) {
+    db_delete('bishal_itonics_products')
+      ->condition('product_id', $product_id)
+      ->execute();
+
+    drupal_set_message(t('Product deleted successfully.'));
+  } else {
+    drupal_set_message(t('Product not found.'), 'error');
+  }
+  drupal_goto('admin/products');
+}
+
+/**
+ * Callback for viewing a product's details.
+ */
+function bishal_itonics_products_view($product_id) {
+  // Fetch product data from the database.
+  $product = db_select('bishal_itonics_products', 'p')
+    ->fields('p')
+    ->condition('product_id', $product_id)
+    ->execute()
+    ->fetchObject();
+
+  // If the product does not exist, show an error message.
+  if (empty($product)) {
+    drupal_set_message(t('Product not found.'), 'error');
+    drupal_goto('admin/products');
+  }
+
+  // Prepare the product details for display.
+  $output = '<h2>' . check_plain($product->title) . '</h2>';
+  $output .= '<p><strong>' . t('Owner Email') . ':</strong> ' . check_plain($product->owner_email) . '</p>';
+  $output .= '<p><strong>' . t('Expiry Date') . ':</strong> ' . check_plain($product->expiry_date) . '</p>';
+  $output .= '<p><strong>' . t('Summary') . ':</strong> ' . check_plain($product->summary) . '</p>';
+  $output .= '<p><strong>' . t('Description') . ':</strong><br>' . check_plain($product->description) . '</p>';
+
+  // Display the product image if it exists.
+  if (!empty($product->image)) {
+    $image_file = file_load($product->image);
+    if ($image_file) {
+      $image_url = file_create_url($image_file->uri);
+      $output .= '<p><img src="' . $image_url . '" alt="' . check_plain($product->title) . '" / height="200px"></p>';
+      $file_name = basename($image_file->uri);
+      $output .= '<span class="file"><img class="file-icon" alt="Image icon" title="image/jpeg" src="/drupal7/modules/file/icons/image-x-generic.png"> <a href="' . $image_url . '" type="image/jpeg">' . $file_name . '</a></span>';
+    }
+  }
+
+  // Add a link to go back to the product list.
+  $output .= '<br>' . l(t('Back to Products'), 'admin/products');
+
+  return $output;
+}
+
+?>
+
+

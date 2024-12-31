@@ -1,0 +1,4 @@
+tinymce.settings_form:
+  title: 'TinyMCE settings'
+  base_route: filter.admin_overview
+  route_name: tinymce.settings_form

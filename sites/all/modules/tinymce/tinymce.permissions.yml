@@ -1,0 +1,3 @@
+'tinymce upload files':
+  title: 'Upload files'
+  description: 'Allow files to be uploaded in the tinymce files folder.'

@@ -1,0 +1,18 @@
+editor.settings.tinymce:
+  type: mapping
+  label: 'TinyMCE settings'
+  mapping:
+    tinymce_editor_settings:
+      type: string
+      label: 'TinyMCE editor settings'
+
+tinymce.settings:
+  type: config_object
+  label: 'TinyMCE library settings'
+  mapping:
+    tinymce_javascript_path:
+      type: string
+      label: 'tinymce.min.js full path'
+    tinymce_self_hosted:
+      type: boolean
+      label: 'Self hosted'

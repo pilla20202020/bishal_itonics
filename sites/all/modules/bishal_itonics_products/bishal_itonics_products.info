@@ -1,0 +1,5 @@
+name = "Bishal ITONICS Products"
+description = "Module to manage ITONICS products with CRUD functionalities."
+core = 7.x
+package = Custom
+dependencies[] = views

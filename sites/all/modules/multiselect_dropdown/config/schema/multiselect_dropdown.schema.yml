@@ -1,0 +1,37 @@
+field.widget.settings.multiselect_dropdown:
+  label: 'Multiselect Dropdown'
+  type: mapping
+  mapping:
+    label_aria:
+      type: string
+      label: Accessible Label
+    label_none:
+      type: string
+      label: None Label
+    label_all:
+      type: string
+      label: All Label
+    label_single:
+      type: string
+      label: Single Label
+    label_plural:
+      type: string
+      label: Plural Label
+    label_select_all:
+      type: string
+      label: Select All Button
+    label_select_none:
+      type: string
+      label: Deselect All Button
+    search_title:
+      type: string
+      label: Search Input Label
+    search_title_display:
+      type: string
+      label: Search Input Label Display
+    search_placeholder:
+      type: string
+      label: Search Input Placeholder
+    search_character_threshold:
+      type: integer
+      label: Search Input Character Threshold

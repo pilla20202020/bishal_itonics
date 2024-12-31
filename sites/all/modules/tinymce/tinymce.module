@@ -1,0 +1,58 @@
+<?php
+
+/**
+ * @file
+ * Integrate the TinyMCE editor (https://www.tiny.cloud/) into Drupal.
+ */
+
+use Drupal\Core\Url;
+
+/**
+ * Implements hook_library_info_build().
+ */
+function tinymce_library_info_build() {
+  $libraries = [];
+
+  $libraries['tinymce'] = [
+    'js' => [
+      'js/tinymce-drupal.js' => [],
+    ],
+    'dependencies' => [
+      'editor/drupal.editor',
+    ],
+  ];
+  $config = \Drupal::config('tinymce.settings');
+  $selfHosted = $config->get('tinymce_self_hosted');
+  $jsPath = $config->get('tinymce_javascript_path');
+  $libraries['tinymce']['js'][$jsPath] = $selfHosted
+    ? ['minified' => TRUE]
+    : ['minified' => TRUE, 'external' => TRUE];
+
+  return $libraries;
+}
+
+/**
+ * Implementation of hook_help().
+ */
+function tinymce_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.tinymce' :
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('TinyMCE adds what-you-see-is-what-you-get (WYSIWYG) html editing to textareas. This editor can be enabled/disabled without reloading the page by clicking a link below each textarea.') . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Enabling TinyMCE for a text format') . '</dt>';
+      $output .= '<dd>' . t('On the <a href=":formats">Text formats and editors page</a> you can see which text editor is associated with each text format. You can change this by clicking on the <em>Configure</em> link, and then choosing TinyMCE from the <em>Text editor</em> drop-down list. TinyMCE will then be displayed with any text field for which this text format is chosen.', [':formats' => Url::fromRoute('filter.admin_overview')->toString()]) . '</dd>';
+      $output .= '<dt>' . t('Configuring TinyMCE') . '</dt>';
+      $output .= '<dd>' . t('Once TinyMCE is associated with a text format, you can configure it by clicking on the <em>Configure</em> link for this format. Depending on the specific text editor, you can configure it by defining a json object like the one passed to TinyMCE JS init() method. For details, see the JS tabs on <a href=":example" target="_blank">this page</a>.', [':example' => 'https://www.tiny.cloud/docs/demo/full-featured/']) . '</dd>';
+      $output .= '<dt>' . t('Retrieve TinyMCE library (self hosted)') . '</dt>';
+      $output .= '<dd>' . t('Once the editor properly configured you can <a href=":library" target="_blank">download the library here</a> to host it. Doing so allow to avoid a notice to be displayed on the editor.', [':library' => 'https://www.tiny.cloud/get-tiny/self-hosted/']) . '</dd>';
+      $output .= '<dt>' . t('Obtain a TinyMCE API key (cloud version)') . '</dt>';
+      $output .= '<dd>' . t('Once the editor properly configured an API key is required to remove the notice on the editor, <a href=":api-key" target="_blank">see more details here</a>.', [':api-key' => 'https://www.tiny.cloud/docs/quick-start/#step3addyourapikey']) . '</dd>';
+      $output .= '<dt>' . t('Enable image upload') . '</dt>';
+      $output .= '<dd>' . t('To enable image upload in the editor, please add the following parameters to the editor settings in the json object:') . '<code><pre>"automatic_uploads": true,<br />"images_upload_url": "/tinymce/upload",</pre></code></dd>';
+      $output .= '</dl>';
+      return $output;
+  }
+}

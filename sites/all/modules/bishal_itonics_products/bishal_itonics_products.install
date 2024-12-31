@@ -1,0 +1,64 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function bishal_itonics_products_schema() {
+  $schema['bishal_itonics_products'] = array(
+    'description' => 'Stores information about ITONICS products.',
+    'fields' => array(
+      'product_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'The unique ID of the product.',
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Title of the product.',
+      ),
+      'image' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'Path to the product image.',
+      ),
+      'summary' => array(
+        'type' => 'text',
+        'description' => 'Summary of the product.',
+      ),
+      'description' => array(
+        'type' => 'text',
+        'description' => 'Detailed description of the product.',
+      ),
+      'category' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Category of the product.',
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Type of the product.',
+      ),
+      'owner_email' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Owner email of the product.',
+      ),
+      'expiry_date' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'Expiry date of the product.',
+      ),
+    ),
+    'primary key' => array('product_id'),
+  );
+
+  return $schema;
+}
+
+?>

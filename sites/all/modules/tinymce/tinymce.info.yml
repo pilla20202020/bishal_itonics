@@ -1,0 +1,11 @@
+name: TinyMCE
+description: "The most popular WYSIWYG editor for advanced content editing."
+core_version_requirement: ^8.8 || ^9
+type: module
+dependencies:
+  - drupal:editor
+
+# Information added by Drupal.org packaging script on 2021-03-21
+version: '1.x-dev'
+project: 'tinymce'
+datestamp: 1616347523
