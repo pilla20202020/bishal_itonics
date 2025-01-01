@@ -74,7 +74,6 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
   // Split the expiry_date into year, month, and day components
   $expiry_date_parts = !empty($product->expiry_date) ? explode('-', $product->expiry_date) : array('', '', '');
 
-  // Use if conditions to assign default values
   $expiry_date = array();
   $expiry_date['year'] = isset($expiry_date_parts[0]) ? $expiry_date_parts[0] : '';
   $expiry_date['month'] = isset($expiry_date_parts[1]) ? $expiry_date_parts[1] : '';
@@ -118,13 +117,15 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
       'beauty' => 'Beauty',
     ),
     '#default_value' => $is_edit ? explode(',', $product->category) : array(),
+    '#attributes' => array('class' => array('multiselect')),
   );
 
   $form['type'] = array(
     '#type' => 'radios',
     '#title' => t('Color'),
     '#options' => array('red' => 'Red', 'blue' => 'Blue'),
-    '#default_value' => $is_edit ? $product->type : '',
+    '#default_value' => $is_edit ? $product->type : 'red',
+    '#required' => TRUE, // Makes the field required
     '#wrapper_attributes' => array('class' => 'form-type-wrapper'),
   );
 
@@ -133,12 +134,21 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
     '#title' => t('Owner Email'),
     '#required' => TRUE,
     '#default_value' => $is_edit ? $product->owner_email : '',
+    '#element_validate' => array('bishal_itonics_validate_email'),
   );
 
   $form['expiry_date'] = array(
-    '#type' => 'date',
+    '#type' => 'date_popup',
     '#title' => t('Expiry Date'),
-    '#default_value' => $expiry_date,
+    '#date_format' => 'Y-m-d',
+    '#date_year_range' => '-5:+5',
+    '#default_value' => $is_edit ? $product->expiry_date : '',
+    '#required' => TRUE,
+  );
+
+  $form['product_id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $is_edit ? $product->product_id : '',
   );
 
   $form['submit'] = array(
@@ -160,12 +170,8 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
  */
 function bishal_itonics_products_form_submit($form, &$form_state) {
   $values = $form_state['values'];
-
-  // Retrieve the product_id from the form state
-  $product_id = $values['product_id'];
-
-  // Construct the expiry date
-  $expiry_date = $values['expiry_date']['year'] . '-' . $values['expiry_date']['month'] . '-' . $values['expiry_date']['day'];
+  $product_id = $values['product_id']; // Retrieve product_id from the form
+  $expiry_date = $values['expiry_date'];
 
   if (!empty($product_id)) {
     // If product_id exists, perform an update
@@ -287,6 +293,20 @@ function bishal_itonics_products_view($product_id) {
   $output .= '<p><strong>' . t('Summary') . ':</strong> ' . check_plain($product->summary) . '</p>';
   $output .= '<p><strong>' . t('Description') . ':</strong><br>' . check_plain($product->description) . '</p>';
 
+  if (!empty($product->category)) {
+    // Convert the stored category string back to an array.
+    $categories = explode(',', $product->category);
+    $category_list = '<ul>';
+    foreach ($categories as $category) {
+      $category_list .= '<li>' . check_plain($category) . '</li>';
+    }
+    $category_list .= '</ul>';
+    $output .= '<p><strong>' . t('Categories') . ':</strong> ' . $category_list . '</p>';
+  }
+
+  $output .= '<p><strong>' . t('Color') . ':</strong> ' . check_plain($product->type) . '</p>';
+
+
   // Display the product image if it exists.
   if (!empty($product->image)) {
     $image_file = file_load($product->image);
@@ -302,6 +322,15 @@ function bishal_itonics_products_view($product_id) {
   $output .= '<br>' . l(t('Back to Products'), 'admin/products');
 
   return $output;
+}
+
+/**
+ * Custom validation callback for email.
+ */
+function bishal_itonics_validate_email($element, &$form_state, $form) {
+  if (!valid_email_address($element['#value'])) {
+    form_error($element, t('Please enter a valid email address.'));
+  }
 }
 
 ?>
