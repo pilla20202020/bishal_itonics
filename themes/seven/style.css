@@ -672,6 +672,27 @@ a.button {
   -webkit-border-radius: 20px;
   border-radius: 20px;
 }
+.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 17px;
+  margin-bottom: 1em;
+  margin-right: 1em; /* LTR */
+  text-align: center;
+  font-weight: normal;
+  font-size: 1.077em;
+  font-family: "Lucida Grande", Verdana, sans-serif;
+  -moz-border-radius: 20px;
+  -webkit-border-radius: 20px;
+  border-radius: 20px;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
 a.button:link,
 a.button:visited,
 a.button:hover,

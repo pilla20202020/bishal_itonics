@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function bishal_itonics_categories_schema() {
+  $schema['bishal_itonics_categories'] = array(
+    'description' => 'Stores information about product categories.',
+    'fields' => array(
+      'category_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'The unique ID of the category.',
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => 'Name of the category.',
+      ),
+    ),
+    'primary key' => array('category_id'),
+  );
+
+  return $schema;
+}
+
+?>

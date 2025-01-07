@@ -8,7 +8,7 @@
 function bishal_itonics_products_menu() {
   $items = array();
 
-  // Route for adding a new product.
+  // Route for adding/editing a product.
   $items['admin/products/add'] = array(
     'title' => 'Add Product',
     'page callback' => 'drupal_get_form',
@@ -27,19 +27,30 @@ function bishal_itonics_products_menu() {
     'type' => MENU_NORMAL_ITEM,
   );
 
-  $items['admin/products/delete'] = array(
+  // Route for deleting a product (with confirmation).
+  $items['admin/products/delete/%'] = array(
     'title' => 'Delete Product',
     'page callback' => 'bishal_itonics_products_delete',
-    'page arguments' => array(3), // ID will be passed as the third argument.
+    'page arguments' => array(3), // The product ID is passed as a parameter.
     'access callback' => 'user_access',
     'access arguments' => array('administer site configuration'),
     'type' => MENU_CALLBACK,
   );
 
+  // Route for viewing a product.
   $items['admin/products/view/%'] = array(
     'title' => 'View Product',
     'page callback' => 'bishal_itonics_products_view',
-    'page arguments' => array(3), // The product_id will be passed as the third argument.
+    'page arguments' => array(3), // The product ID is passed as a parameter.
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/categories/create'] = array(
+    'title' => 'Create Category',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('bishal_itonics_create_category_form'),
     'access callback' => 'user_access',
     'access arguments' => array('administer site configuration'),
     'type' => MENU_CALLBACK,
@@ -53,6 +64,7 @@ function bishal_itonics_products_menu() {
  */
 function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
   // Check if we are editing an existing product, by getting the 'id' from the query string
+  drupal_add_library('system', 'ajax');
   $product_id = isset($_GET['id']) ? $_GET['id'] : NULL;
 
   // If product_id is available, load the product data
@@ -81,6 +93,16 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
 
   $is_edit = !empty($product);
 
+  // Fetch categories from the database
+  $categories_query = db_select('bishal_itonics_categories', 'c')
+    ->fields('c', array('category_id', 'category_name'))
+    ->execute();
+
+  $categories = array();
+  foreach ($categories_query as $category) {
+    $categories[$category->category_id] = $category->category_name;
+  }
+
   $form['title'] = array(
     '#type' => 'textfield',
     '#title' => t('Title'),
@@ -108,17 +130,54 @@ function bishal_itonics_products_form($form, &$form_state, $product = NULL) {
     '#format' => 'full_html',
   );
 
+  // $form['category'] = array(
+  //   '#type' => 'multiselect',
+  //   '#title' => t('Category'),
+  //   '#options' => array(
+  //     'fashion' => 'Fashion',
+  //     'electronics' => 'Electronics',
+  //     'beauty' => 'Beauty',
+  //   ),
+  //   '#default_value' => $is_edit ? explode(',', $product->category) : array(),
+  //   '#attributes' => array('class' => array('multiselect')),
+  // );
+
   $form['category'] = array(
-    '#type' => 'multiselect',
+    '#type' => 'multiselect',  // Changed from 'multiselect' to 'select' for better UX
     '#title' => t('Category'),
-    '#options' => array(
-      'fashion' => 'Fashion',
-      'electronics' => 'Electronics',
-      'beauty' => 'Beauty',
-    ),
-    '#default_value' => $is_edit ? explode(',', $product->category) : array(),
-    '#attributes' => array('class' => array('multiselect')),
+    '#options' => $categories,
+    '#default_value' => $is_edit ? explode(',', $product->category) : array(),  // assuming 'category_id' for products
+        '#attributes' => array('class' => array('multiselect')),
   );
+
+  $form['new_category_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('New Category Name'),
+    '#description' => t('Enter a new category name if you want to create a new one.<br>Note*:Please reload the page after creating a new category.'),
+    '#default_value' => '',
+    '#required' => FALSE,
+  );
+
+  $form['create_category_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Create Category'),
+    '#submit' => array('bishal_itonics_create_category_form'),
+    '#ajax' => array(
+      'callback' => 'bishal_itonics_create_category_ajax_callback',
+      'wrapper' => 'category-message-wrapper',
+      'effect' => 'fade',
+      'progress' => array(
+        'type' => 'throbber',
+        'message' => t('Creating category...'),
+      ),
+    ),
+  );
+
+  $form['category_message_wrapper'] = array(
+    '#type' => 'container',
+    '#attributes' => array('id' => 'category-message-wrapper'),
+  );
+
 
   $form['type'] = array(
     '#type' => 'radios',
@@ -173,14 +232,17 @@ function bishal_itonics_products_form_submit($form, &$form_state) {
   $product_id = $values['product_id']; // Retrieve product_id from the form
   $expiry_date = $values['expiry_date'];
 
+  $description = check_markup($values['description']['value'], TRUE);
+  $summary = check_plain($values['summary']);  // Use check_plain for non-HTML content
+
   if (!empty($product_id)) {
     // If product_id exists, perform an update
     db_update('bishal_itonics_products')
       ->fields(array(
         'title' => $values['title'],
         'image' => $values['image'],
-        'summary' => $values['summary'],
-        'description' => $values['description']['value'],
+        'summary' => $summary,
+        'description' => $description,
         'category' => implode(',', $values['category']),
         'type' => $values['type'],
         'owner_email' => $values['owner_email'],
@@ -257,16 +319,61 @@ function bishal_itonics_products_list() {
  * Callback for deleting a product.
  */
 function bishal_itonics_products_delete($product_id) {
+  $product = db_select('bishal_itonics_products', 'p')
+    ->fields('p', array('product_id', 'title'))
+    ->condition('product_id', $product_id)
+    ->execute()
+    ->fetchObject();
+
+  if (!$product) {
+    drupal_set_message(t('Product not found.'), 'error');
+    drupal_goto('admin/products');
+  }
+
+  // Build the confirmation form.
+  return drupal_get_form('bishal_itonics_products_delete_confirm_form', $product);
+}
+
+function bishal_itonics_products_delete_confirm_form($form, &$form_state, $product) {
+  $form['product_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $product->product_id,
+  );
+
+  $form['message'] = array(
+    '#markup' => t('Are you sure you want to delete the product: %title?', array('%title' => $product->title)),
+  );
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete'),
+    '#button_type' => 'primary',
+    '#attributes' => array(
+      'class' => array('button delete-button', 'btn', 'btn-danger'),
+    ),
+  );
+
+  $form['actions']['cancel'] = array(
+    '#type' => 'markup',
+    '#markup' => l(t('Cancel'), 'admin/products', array('attributes' => array('class' => array('button cancel-button')))),
+  );
+
+  return $form;
+}
+
+function bishal_itonics_products_delete_confirm_form_submit($form, &$form_state) {
+  $product_id = $form_state['values']['product_id'];
   if ($product_id) {
     db_delete('bishal_itonics_products')
       ->condition('product_id', $product_id)
       ->execute();
-
     drupal_set_message(t('Product deleted successfully.'));
   } else {
     drupal_set_message(t('Product not found.'), 'error');
   }
-  drupal_goto('admin/products');
+
+  $form_state['redirect'] = 'admin/products';
 }
 
 /**
@@ -332,6 +439,43 @@ function bishal_itonics_validate_email($element, &$form_state, $form) {
     form_error($element, t('Please enter a valid email address.'));
   }
 }
+
+
+function bishal_itonics_create_category_ajax_callback($form, &$form_state) {
+  $message = '';
+
+  if (!empty($form_state['values']['new_category_name'])) {
+      // Insert the new category into the database
+      db_insert('bishal_itonics_categories')
+          ->fields(array('category_name' => $form_state['values']['new_category_name']))
+          ->execute();
+
+      // Clear the field value after successful creation
+      $form_state['values']['new_category_name'] = '';
+
+      $message = '<div class="messages messages--status" id="category-message">' . t('Category created successfully.<br> Please reload this page') . '</div>';
+
+      $form_state['rebuild'] = TRUE; // Ensure the form is rebuilt
+
+      // Attach reload script and message hiding script
+      drupal_add_js('
+          setTimeout(function() {
+              var messageElement = document.getElementById("category-message");
+              if (messageElement) {
+                  messageElement.style.display = "none"; // Hide the message first
+              }
+              window.location.reload(); // Reload the page after the message is hidden
+          }, 5000); // Wait 5 seconds before hiding the message and reloading the page
+      ', 'inline');
+  } else {
+      $message = '<div class="messages messages--error" id="category-message">' . t('Please enter a category name.') . '</div>';
+  }
+
+  return array(
+    '#markup' => $message, // The message will be shown inside the 'category-message-wrapper'
+  );
+}
+
 
 ?>
 
